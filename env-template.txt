@@ -1,0 +1,29 @@
+# CareerCoach AI - Environment Variables
+# Copy this to .env.local for local development
+
+# Database (Neon Postgres)
+DATABASE_URL="postgresql://neondb_owner:npg_ga7wpTm6PbSL@ep-wandering-band-a1cnj7q7-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+# Authentication (Clerk)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_cnVsaW5nLWdydWItOTkuY2xlcmsuYWNjb3VudHMuZGV2JA"
+CLERK_SECRET_KEY="sk_test_1qGC09907SfD9U4KhdOIchIwBof4Wokf6iIoVWWOJ9"
+NEXT_PUBLIC_CLERK_SIGN_IN_URL="/sign-in"
+NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up"
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL="/onboarding"
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL="/onboarding"
+
+# AI Services (Google Gemini)
+GEMINI_API_KEY="AIzaSyAn83WJggy1sUmLT54vloPmP3nVTUC8cZ0"
+
+# Background Jobs (Inngest)
+INNGEST_EVENT_KEY="EAYlxIh_JeeU9LosbgAfYHb8zbNyvuUxT1YQV2YdS3oZVX4r5PtHl5n4U91RMumgq4iyT7VLupRvnNmQ3Lfbxg"
+INNGEST_SIGNING_KEY="signkey-prod-fac11fc457c117593a4f420fb7224f8f99c791766a5ba414a4a8ceb0189dfd0e"
+
+# Caching & Rate Limiting (Upstash Redis)
+UPSTASH_REDIS_REST_URL="https://accepted-ram-7128.upstash.io"
+UPSTASH_REDIS_REST_TOKEN="ARvYAAImcDJlZWMxMTg0NWE1ZWI0NmVkYTRkMDUxODk2ZjFhMDcwM3AyNzEyOA"
+
+# Optional Services (Uncomment if needed)
+# SENTRY_DSN=""
+# ANALYTICS_ID=""
+# NEXT_PUBLIC_APP_URL="http://localhost:3000"

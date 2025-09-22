@@ -27,6 +27,7 @@ model User {
   assessments   Assessment[]
   resume        Resume?
   coverLetter   CoverLetter[]
+  jobs          Job[]
   
   // New feature relations
   notifications Notification[]

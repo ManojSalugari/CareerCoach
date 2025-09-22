@@ -163,3 +163,80 @@ export async function getAssessments() {
     throw new Error("Failed to fetch assessments");
   }
 }
+
+// Open-ended HR/TR voice interview support
+export async function generateOpenEndedQuestions({ mode = "HR", jobDescription, resumeContent }) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const user = await db.user.findUnique({ where: { clerkUserId: userId } });
+  if (!user) throw new Error("User not found");
+
+  const prompt = `
+    Create 5 open-ended ${mode === "TR" ? "technical (TR)" : "behavioral (HR)"} interview questions tailored to the candidate, using their resume and the target job description.
+
+    Job Description:\n${jobDescription || "(not provided)"}
+    Resume:\n${resumeContent || "(not provided)"}
+
+    Return ONLY this JSON:
+    {
+      "questions": [
+        {
+          "question": "string",
+          "rubric": ["string", "string", "string"]
+        }
+      ]
+    }
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/```(?:json)?\n?/g, "").trim();
+    const parsed = JSON.parse(text);
+    return parsed.questions;
+  } catch (error) {
+    console.error("Error generating open-ended questions:", error);
+    throw new Error("Failed to generate interview questions");
+  }
+}
+
+export async function evaluateOpenEndedAnswer({ mode = "HR", question, answer, jobDescription, resumeContent }) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const user = await db.user.findUnique({ where: { clerkUserId: userId } });
+  if (!user) throw new Error("User not found");
+
+  const prompt = `
+    Evaluate the candidate's ${mode === "TR" ? "technical" : "behavioral"} interview answer.
+
+    Question: ${question}
+    Answer: ${answer}
+    Job Description: ${jobDescription || "(not provided)"}
+    Resume: ${resumeContent || "(not provided)"}
+
+    Score dimensions 0-10 each and provide a brief, actionable feedback and one follow-up probing question.
+    Return ONLY this JSON:
+    {
+      "scores": {
+        "relevance": number,
+        "clarity": number,
+        "structure": number,
+        "depth": number
+      },
+      "overall": number,
+      "feedback": "string",
+      "followUp": "string"
+    }
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/```(?:json)?\n?/g, "").trim();
+    const parsed = JSON.parse(text);
+    return parsed;
+  } catch (error) {
+    console.error("Error evaluating answer:", error);
+    throw new Error("Failed to evaluate answer");
+  }
+}

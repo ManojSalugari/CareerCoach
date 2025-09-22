@@ -28,7 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
-const DashboardView = ({ insights, atsHistory = [] }) => {
+const DashboardView = ({ insights, atsHistory = [], assessmentsByTopic = [] }) => {
   // Transform salary data for the chart
   const salaryData = insights.salaryRanges.map((range) => ({
     name: range.role,
@@ -210,6 +210,27 @@ const DashboardView = ({ insights, atsHistory = [] }) => {
                 <Bar dataKey="min" fill="#94a3b8" name="Min Salary (K)" />
                 <Bar dataKey="median" fill="#64748b" name="Median Salary (K)" />
                 <Bar dataKey="max" fill="#475569" name="Max Salary (K)" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quiz Accuracy by Topic */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Interview Accuracy by Topic</CardTitle>
+          <CardDescription>Aggregate accuracy from your assessments</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={assessmentsByTopic}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="topic" />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <Bar dataKey="accuracy" fill="#10b981" name="Accuracy %" />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -23,6 +23,23 @@ export async function generateCoverLetter(data) {
     ? data.accomplishments
     : (data.accomplishments ? String(data.accomplishments).split(/\n+/).map((s) => s.trim()).filter(Boolean) : []);
 
+  // Optional company personalization
+  let companySummary = "";
+  try {
+    if (data.personalize) {
+      const res = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
+          data.companyName
+        )}`,
+        { next: { revalidate: 60 * 60 * 24 } }
+      );
+      if (res.ok) {
+        const wiki = await res.json();
+        companySummary = wiki.extract || "";
+      }
+    }
+  } catch {}
+
   const prompt = `
     Write a ${tone} cover letter for a ${data.jobTitle} position at ${data.companyName}.
 
@@ -35,6 +52,9 @@ export async function generateCoverLetter(data) {
 
     Job Description:
     ${data.jobDescription}
+
+    Company Context (if provided):
+    ${companySummary}
 
     Style guidelines:
     - Template Style: ${style} (${style === "classic" ? "business letter format with clear paragraphs" : style === "modern" ? "short paragraphs, skimmable bullets, bold highlights for impact" : "very concise, focused on alignment and value"})
@@ -76,16 +96,20 @@ export async function listCoverLetterTemplates() {
     { id: "concise", name: "Concise Alignment" },
   ];
 }
-        status: "completed",
-        userId: user.id,
-      },
-    });
 
-    return coverLetter;
-  } catch (error) {
-    console.error("Error generating cover letter:", error.message);
-    throw new Error("Failed to generate cover letter");
+export async function generateCoverLetterVariations(base) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+  const user = await db.user.findUnique({ where: { clerkUserId: userId } });
+  if (!user) throw new Error("User not found");
+
+  const tones = Array.isArray(base.tones) && base.tones.length ? base.tones : ["professional", "confident", "enthusiastic"];
+  const results = [];
+  for (const t of tones) {
+    const letter = await generateCoverLetter({ ...base, tone: t });
+    results.push(letter);
   }
+  return results;
 }
 
 export async function getCoverLetters() {

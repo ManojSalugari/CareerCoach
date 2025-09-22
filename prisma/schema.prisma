@@ -214,3 +214,25 @@ model Achievement {
   @@index([userId])
   @@index([badgeType])
 }
+
+// Job Tracking
+model Job {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  title       String
+  company     String
+  location    String?
+  url         String?
+  status      String   @default("saved") // saved, applied, interview, offer, rejected
+  appliedAt   DateTime?
+  deadline    DateTime?
+  reminderAt  DateTime?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([deadline])
+}

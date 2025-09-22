@@ -2,9 +2,7 @@ import { getAssessments } from "@/actions/interview";
 import StatsCards from "./_components/stats-cards";
 import PerformanceChart from "./_components/performace-chart";
 import QuizList from "./_components/quiz-list";
-import dynamic from "next/dynamic";
-
-const OpenVoiceInterview = dynamic(() => import("./_components/open-voice"), { ssr: false });
+import OpenVoiceInterview from "./_components/open-voice";
 
 export default async function InterviewPrepPage() {
   const assessments = await getAssessments();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, CheckCircle, TrendingUp, Target, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
+import { saveResume } from "@/actions/resume";
 import useFetch from "@/hooks/use-fetch";
 import {
   analyzeResumeATS,
@@ -67,10 +68,12 @@ const SuggestionCard = ({ suggestion, priority }) => {
 
 export default function ATSOptimizationPanel({ resumeContent }) {
   const [jobDescription, setJobDescription] = useState("");
+  const [resumeText, setResumeText] = useState(resumeContent || "");
   const [analysis, setAnalysis] = useState(null);
   const [suggestions, setSuggestions] = useState(null);
   const [comparison, setComparison] = useState(null);
   const [activeTab, setActiveTab] = useState("analysis");
+  const [jdFileName, setJdFileName] = useState("");
 
   const {
     loading: analysisLoading,
@@ -86,6 +89,11 @@ export default function ATSOptimizationPanel({ resumeContent }) {
     loading: comparisonLoading,
     fn: compareResume,
   } = useFetch(compareResumeToJob);
+
+  const {
+    loading: saveLoading,
+    fn: saveResumeAction,
+  } = useFetch(saveResume);
 
   const {
     loading: historyLoading,
@@ -153,6 +161,83 @@ export default function ATSOptimizationPanel({ resumeContent }) {
     return "text-red-600";
   };
 
+  const handleJDFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".txt")) {
+      toast.error("Please upload a .txt file for the job description");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setJobDescription(String(reader.result || ""));
+      setJdFileName(file.name);
+      toast.success("Job description loaded from file");
+    };
+    reader.onerror = () => toast.error("Failed to read the file");
+    reader.readAsText(file);
+  };
+
+  const highlightKeywordsInText = (text, keywords) => {
+    if (!text || !Array.isArray(keywords) || keywords.length === 0) return text;
+    // Escape regex special chars and build a single regex for all keywords (word-boundaries where sensible)
+    const escaped = keywords
+      .filter(Boolean)
+      .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .filter((k) => k.length > 1);
+    if (escaped.length === 0) return text;
+    const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+    return text.split(regex).map((part, idx) => {
+      const match = escaped.some((kw) => new RegExp(`^${kw}$`, "i").test(part));
+      return match ? (
+        <mark key={idx} className="bg-yellow-200 text-black px-0.5 rounded">
+          {part}
+        </mark>
+      ) : (
+        <span key={idx}>{part}</span>
+      );
+    });
+  };
+
+  useEffect(() => {
+    setResumeText(resumeContent || "");
+  }, [resumeContent]);
+
+  const ensureTargetedKeywordsSection = (text) => {
+    if (/^Targeted Keywords:/im.test(text)) return text;
+    return `${text}\n\nTargeted Keywords: `;
+  };
+
+  const insertKeywordIntoResume = (keyword) => {
+    if (!keyword) return;
+    if (new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(resumeText)) {
+      toast.info("Keyword already present in resume");
+      return;
+    }
+    const withSection = ensureTargetedKeywordsSection(resumeText);
+    const updated = withSection.replace(/(Targeted Keywords:\s*)(.*)/i, (m, p1, p2) => {
+      const existing = p2.trim();
+      if (!existing) return `${p1}${keyword}`;
+      // Avoid duplicate separators
+      return `${p1}${existing.replace(/\s*[•,]\s*$/, "")}, ${keyword}`;
+    });
+    setResumeText(updated);
+    toast.success(`Inserted "${keyword}" into resume`);
+  };
+
+  const handleSaveResume = async () => {
+    if (!resumeText.trim()) {
+      toast.error("Resume content is empty");
+      return;
+    }
+    try {
+      await saveResumeAction(resumeText);
+      toast.success("Resume saved");
+    } catch {
+      toast.error("Failed to save resume");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -176,6 +261,19 @@ export default function ATSOptimizationPanel({ resumeContent }) {
               className="mt-1"
               rows={4}
             />
+            <div className="flex items-center gap-3 mt-3">
+              <Input
+                id="jd-file"
+                type="file"
+                accept=".txt"
+                onChange={handleJDFileUpload}
+              />
+              {jdFileName ? (
+                <span className="text-xs text-gray-600">Loaded: {jdFileName}</span>
+              ) : (
+                <span className="text-xs text-gray-500">Upload .txt file</span>
+              )}
+            </div>
           </div>
           
           <div className="flex space-x-2">
@@ -277,6 +375,76 @@ export default function ATSOptimizationPanel({ resumeContent }) {
                     </CardContent>
                   </Card>
                 </div>
+
+                {analysis.keywordAnalysis && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Keyword Analysis</CardTitle>
+                        <CardDescription>
+                          Missing, overused, and recommended keywords
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <h4 className="font-medium text-red-600 mb-2 text-sm">Missing</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {analysis.keywordAnalysis.missingKeywords?.length ? (
+                                analysis.keywordAnalysis.missingKeywords.map((k, i) => (
+                                  <Badge key={i} variant="destructive">{k}</Badge>
+                                ))
+                              ) : (
+                                <span className="text-xs text-gray-500">None</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-yellow-700 mb-2 text-sm">Overused</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {analysis.keywordAnalysis.overusedKeywords?.length ? (
+                                analysis.keywordAnalysis.overusedKeywords.map((k, i) => (
+                                  <Badge key={i} variant="secondary">{k}</Badge>
+                                ))
+                              ) : (
+                                <span className="text-xs text-gray-500">None</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-green-700 mb-2 text-sm">Recommended</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {analysis.keywordAnalysis.recommendedKeywords?.length ? (
+                                analysis.keywordAnalysis.recommendedKeywords.map((k, i) => (
+                                  <Badge key={i} variant="outline">{k}</Badge>
+                                ))
+                              ) : (
+                                <span className="text-xs text-gray-500">None</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Resume Preview with Highlights</CardTitle>
+                        <CardDescription>
+                          Present keywords highlighted in your resume
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="prose max-w-none whitespace-pre-wrap text-sm leading-relaxed p-3 border rounded-md">
+                          {highlightKeywordsInText(
+                            resumeContent,
+                            analysis.keywordAnalysis.recommendedKeywords || []
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
 
                 {analysis.suggestions && (
                   <Card>
@@ -435,6 +603,59 @@ export default function ATSOptimizationPanel({ resumeContent }) {
                     </CardContent>
                   </Card>
                 </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Job Description</CardTitle>
+                      <CardDescription>Reference text</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="prose max-w-none whitespace-pre-wrap text-sm leading-relaxed p-3 border rounded-md">
+                        {jobDescription || "No job description provided"}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Resume Editor</CardTitle>
+                      <CardDescription>Insert missing keywords and save</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Textarea
+                        value={resumeText}
+                        onChange={(e) => setResumeText(e.target.value)}
+                        rows={14}
+                        className="font-mono text-sm"
+                      />
+                      <div className="flex justify-end">
+                        <Button onClick={handleSaveResume} disabled={saveLoading}>
+                          {saveLoading ? "Saving..." : "Save Resume"}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Missing Keywords</CardTitle>
+                    <CardDescription>Click to insert into resume</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {(comparison.keywordAlignment?.missingKeywords || comparison.requiredSkillsMatch?.missing || []).map((k, i) => (
+                        <Button key={`${k}-${i}`} size="sm" variant="outline" onClick={() => insertKeywordIntoResume(k)}>
+                          + {k}
+                        </Button>
+                      ))}
+                      {(!comparison.keywordAlignment?.missingKeywords || comparison.keywordAlignment?.missingKeywords.length === 0) && (!comparison.requiredSkillsMatch?.missing || comparison.requiredSkillsMatch?.missing.length === 0) && (
+                        <span className="text-sm text-gray-500">No missing keywords detected</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </>
             )}
           </TabsContent>

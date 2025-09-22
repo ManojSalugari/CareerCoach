@@ -28,7 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
-const DashboardView = ({ insights }) => {
+const DashboardView = ({ insights, atsHistory = [] }) => {
   // Transform salary data for the chart
   const salaryData = insights.salaryRanges.map((range) => ({
     name: range.role,
@@ -142,6 +142,38 @@ const DashboardView = ({ insights }) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* ATS Score Trend */}
+      <Card className="col-span-4">
+        <CardHeader>
+          <CardTitle>ATS Score Trend</CardTitle>
+          <CardDescription>Last {Math.min(atsHistory.length, 10)} analyses</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={atsHistory.map((a) => ({
+                  name: new Date(a.analyzedAt).toLocaleDateString(),
+                  score: a.score,
+                  keyword: a.keywordMatch,
+                  format: a.formatScore,
+                  structure: a.structureScore,
+                }))}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <Bar dataKey="score" fill="#1d4ed8" name="Overall" />
+                <Bar dataKey="keyword" fill="#16a34a" name="Keyword" />
+                <Bar dataKey="format" fill="#f59e0b" name="Format" />
+                <Bar dataKey="structure" fill="#ef4444" name="Structure" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Salary Ranges Chart */}
       <Card className="col-span-4">

@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { generateCoverLetter } from "@/actions/cover-letter";
+import { generateCoverLetter, listCoverLetterTemplates } from "@/actions/cover-letter";
 import useFetch from "@/hooks/use-fetch";
 import { coverLetterSchema } from "@/app/lib/schema";
 import { useEffect } from "react";
@@ -24,6 +24,9 @@ import { useRouter } from "next/navigation";
 
 export default function CoverLetterGenerator() {
   const router = useRouter();
+  const [tone, setTone] = useState("professional");
+  const [templateStyle, setTemplateStyle] = useState("classic");
+  const [accomplishments, setAccomplishments] = useState("");
 
   const {
     register,
@@ -51,7 +54,15 @@ export default function CoverLetterGenerator() {
 
   const onSubmit = async (data) => {
     try {
-      await generateLetterFn(data);
+      await generateLetterFn({
+        ...data,
+        tone,
+        templateStyle,
+        accomplishments: accomplishments
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      });
     } catch (error) {
       toast.error(error.message || "Failed to generate cover letter");
     }
@@ -96,6 +107,30 @@ export default function CoverLetterGenerator() {
                     {errors.jobTitle.message}
                   </p>
                 )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Tone</Label>
+                <select className="w-full border rounded p-2" value={tone} onChange={(e) => setTone(e.target.value)}>
+                  <option value="professional">Professional</option>
+                  <option value="enthusiastic">Enthusiastic</option>
+                  <option value="confident">Confident</option>
+                  <option value="friendly">Friendly</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Template Style</Label>
+                <select className="w-full border rounded p-2" value={templateStyle} onChange={(e) => setTemplateStyle(e.target.value)}>
+                  <option value="classic">Classic Business</option>
+                  <option value="modern">Modern Impact</option>
+                  <option value="concise">Concise Alignment</option>
+                </select>
+              </div>
+              <div className="space-y-2 md:col-span-1">
+                <Label>Accomplishments (one per line)</Label>
+                <Textarea value={accomplishments} onChange={(e) => setAccomplishments(e.target.value)} rows={4} placeholder="Led team of 6 to ship X\nIncreased conversion by 18%" />
               </div>
             </div>
 

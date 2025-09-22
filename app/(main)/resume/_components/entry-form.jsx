@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { entrySchema } from "@/app/lib/schema";
-import { Sparkles, PlusCircle, X, Pencil, Save, Loader2 } from "lucide-react";
+import { Sparkles, PlusCircle, X, Pencil, Save, Loader2, ArrowDown, ArrowUp } from "lucide-react";
 import { improveWithAI } from "@/actions/resume";
 import { toast } from "sonner";
 import useFetch from "@/hooks/use-fetch";
@@ -29,6 +29,7 @@ const formatDisplayDate = (dateString) => {
 
 export function EntryForm({ type, entries, onChange }) {
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(null);
 
   const {
     register,
@@ -67,6 +68,15 @@ export function EntryForm({ type, entries, onChange }) {
   const handleDelete = (index) => {
     const newEntries = entries.filter((_, i) => i !== index);
     onChange(newEntries);
+  };
+
+  const moveEntry = (from, to) => {
+    if (to < 0 || to >= entries.length) return;
+    const copy = [...entries];
+    const [item] = copy.splice(from, 1);
+    copy.splice(to, 0, item);
+    onChange(copy);
+    setSelectedIndex(to);
   };
 
   const {
@@ -128,6 +138,14 @@ export function EntryForm({ type, entries, onChange }) {
               <p className="mt-2 text-sm whitespace-pre-wrap">
                 {item.description}
               </p>
+              <div className="flex gap-2 mt-3">
+                <Button type="button" variant="ghost" size="sm" onClick={() => moveEntry(index, index - 1)}>
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => moveEntry(index, index + 1)}>
+                  <ArrowDown className="h-4 w-4" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -214,6 +232,7 @@ export function EntryForm({ type, entries, onChange }) {
                 {...register("description")}
                 error={errors.description}
               />
+              <BulletScorer text={watch("description")} />
               {errors.description && (
                 <p className="text-sm text-red-500">
                   {errors.description.message}
@@ -269,6 +288,47 @@ export function EntryForm({ type, entries, onChange }) {
           Add {type}
         </Button>
       )}
+    </div>
+  );
+}
+
+function BulletScorer({ text }) {
+  if (!text) return null;
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const scoreLine = (line) => {
+    let score = 0;
+    const hasActionVerb = /^(Led|Built|Implemented|Optimized|Increased|Reduced|Developed|Designed|Launched|Managed|Owned|Drove)\b/i.test(
+      line
+    );
+    const hasMetric = /(\d+%|\d+\s?(x|times)|\$\d+|\d+\+|[0-9]{1,3}(,\d{3})*)/i.test(line);
+    const hasSTAR = /(Situation|Task|Action|Result)/i.test(line) || /(by|resulting in|which led to)/i.test(line);
+    if (hasActionVerb) score += 1;
+    if (hasMetric) score += 1;
+    if (hasSTAR) score += 1;
+    return { score, hasActionVerb, hasMetric, hasSTAR };
+  };
+
+  return (
+    <div className="mt-2 space-y-1">
+      {lines.map((line, idx) => {
+        const { score, hasActionVerb, hasMetric, hasSTAR } = scoreLine(line);
+        const color = score === 3 ? "text-green-600" : score === 2 ? "text-yellow-700" : "text-red-600";
+        return (
+          <div key={idx} className="text-xs">
+            <span className={`font-medium ${color}`}>[{score}/3]</span>{" "}
+            <span className="text-gray-700">{line}</span>
+            <span className="ml-2 text-gray-500">
+              {!hasActionVerb && "Add an action verb."}{!hasActionVerb && (hasMetric || hasSTAR) ? " " : ""}
+              {!hasMetric && "Add a metric (%, $, x)."}{!hasMetric && hasSTAR ? " " : ""}
+              {!hasSTAR && "Add context/result (STAR)."}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

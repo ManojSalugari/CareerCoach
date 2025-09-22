@@ -7,7 +7,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-export async function generateQuiz() {
+export async function generateQuiz(options = {}) {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
@@ -21,23 +21,27 @@ export async function generateQuiz() {
 
   if (!user) throw new Error("User not found");
 
+  const difficulty = options.difficulty || "mixed"; // easy | medium | hard | mixed
+  const topics = Array.isArray(options.topics) && options.topics.length
+    ? options.topics.join(", ")
+    : (user.skills?.slice(0, 5).join(", ") || "core fundamentals");
+
   const prompt = `
-    Generate 10 technical interview questions for a ${
-      user.industry
-    } professional${
-    user.skills?.length ? ` with expertise in ${user.skills.join(", ")}` : ""
-  }.
-    
+    Generate 10 ${difficulty} technical interview questions for a ${user.industry} professional.
+    Focus topics: ${topics}.
+
     Each question should be multiple choice with 4 options.
+    Include a concise explanation and a topic tag for spaced repetition.
     
-    Return the response in this JSON format only, no additional text:
+    Return ONLY this JSON (no extra text):
     {
       "questions": [
         {
           "question": "string",
           "options": ["string", "string", "string", "string"],
           "correctAnswer": "string",
-          "explanation": "string"
+          "explanation": "string",
+          "topic": "string"
         }
       ]
     }
@@ -73,10 +77,12 @@ export async function saveQuizResult(questions, answers, score) {
     userAnswer: answers[index],
     isCorrect: q.correctAnswer === answers[index],
     explanation: q.explanation,
+    topic: q.topic || null,
   }));
 
   // Get wrong answers
   const wrongAnswers = questionResults.filter((q) => !q.isCorrect);
+  const wrongTopics = Array.from(new Set(wrongAnswers.map((w) => w.topic).filter(Boolean)));
 
   // Only generate improvement tips if there are wrong answers
   let improvementTip = null;
@@ -88,7 +94,7 @@ export async function saveQuizResult(questions, answers, score) {
       )
       .join("\n\n");
 
-    const improvementPrompt = `
+      const improvementPrompt = `
       The user got the following ${user.industry} technical interview questions wrong:
 
       ${wrongQuestionsText}
@@ -97,6 +103,7 @@ export async function saveQuizResult(questions, answers, score) {
       Focus on the knowledge gaps revealed by these wrong answers.
       Keep the response under 2 sentences and make it encouraging.
       Don't explicitly mention the mistakes, instead focus on what to learn/practice.
+      Also, recommend 3 priority topics from [${wrongTopics.join(", ")}] if available.
     `;
 
     try {
@@ -118,6 +125,8 @@ export async function saveQuizResult(questions, answers, score) {
         questions: questionResults,
         category: "Technical",
         improvementTip,
+        // Store wrong topic summary for spaced repetition UI
+        // This remains inside questions JSON; clients can derive as needed
       },
     });
 

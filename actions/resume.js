@@ -32,6 +32,19 @@ export async function saveResume(content) {
       },
     });
 
+    // Save a new version snapshot
+    try {
+      await db.resumeVersion.create({
+        data: {
+          resumeId: resume.id,
+          content,
+          note: "Autosaved",
+        },
+      });
+    } catch (e) {
+      console.error("Error saving resume version:", e);
+    }
+
     revalidatePath("/resume");
     return resume;
   } catch (error) {
@@ -54,6 +67,26 @@ export async function getResume() {
     where: {
       userId: user.id,
     },
+  });
+}
+
+export async function getResumeVersions() {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const user = await db.user.findUnique({
+    where: { clerkUserId: userId },
+  });
+
+  if (!user) throw new Error("User not found");
+
+  const resume = await db.resume.findUnique({ where: { userId: user.id } });
+  if (!resume) return [];
+
+  return await db.resumeVersion.findMany({
+    where: { resumeId: resume.id },
+    orderBy: { createdAt: "desc" },
+    take: 10,
   });
 }
 

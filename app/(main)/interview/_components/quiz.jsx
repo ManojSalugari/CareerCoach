@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,11 @@ export default function Quiz() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [difficulty, setDifficulty] = useState("mixed");
+  const [topics, setTopics] = useState("");
+  const [timeLeft, setTimeLeft] = useState(null); // seconds
+  const [voiceMode, setVoiceMode] = useState(false);
+  const recognitionRef = useRef(null);
 
   const {
     loading: generatingQuiz,
@@ -38,8 +43,20 @@ export default function Quiz() {
   useEffect(() => {
     if (quizData) {
       setAnswers(new Array(quizData.length).fill(null));
+      // 60 seconds per question default
+      setTimeLeft(quizData.length * 60);
     }
   }, [quizData]);
+
+  useEffect(() => {
+    if (timeLeft === null) return;
+    if (timeLeft <= 0) {
+      finishQuiz();
+      return;
+    }
+    const id = setInterval(() => setTimeLeft((s) => (s !== null ? s - 1 : s)), 1000);
+    return () => clearInterval(id);
+  }, [timeLeft]);
 
   const handleAnswer = (answer) => {
     const newAnswers = [...answers];
@@ -80,8 +97,72 @@ export default function Quiz() {
     setCurrentQuestion(0);
     setAnswers([]);
     setShowExplanation(false);
-    generateQuizFn();
+    generateQuizFn({ difficulty, topics: topics.split(",").map((t) => t.trim()).filter(Boolean) });
     setResultData(null);
+  };
+
+  const speak = (text) => {
+    try {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1;
+      utter.pitch = 1;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utter);
+    } catch {}
+  };
+
+  const speakCurrentQuestion = () => {
+    if (!quizData) return;
+    const q = quizData[currentQuestion];
+    const text = `Question ${currentQuestion + 1}. ${q.question}. Options: ${q.options
+      .map((o, i) => `${String.fromCharCode(65 + i)}: ${o}`)
+      .join(". ")}.`;
+    speak(text);
+  };
+
+  useEffect(() => {
+    if (voiceMode && quizData) {
+      speakCurrentQuestion();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceMode, currentQuestion, quizData]);
+
+  const startListening = () => {
+    try {
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        toast.error("Speech recognition not supported in this browser");
+        return;
+      }
+      const rec = new SpeechRecognition();
+      rec.lang = "en-US";
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onresult = (e) => {
+        const transcript = e.results[0][0].transcript.toLowerCase();
+        const map = { a: 0, b: 1, c: 2, d: 3 };
+        let picked = null;
+        Object.keys(map).forEach((k) => {
+          if (transcript.includes(k)) picked = map[k];
+        });
+        if (picked === null) {
+          // try to match by option text snippet
+          const q = quizData[currentQuestion];
+          const hitIdx = q.options.findIndex((o) => transcript.includes(o.toLowerCase().split(" ")[0]));
+          if (hitIdx >= 0) picked = hitIdx;
+        }
+        if (picked !== null) {
+          handleAnswer(quizData[currentQuestion].options[picked]);
+          toast.success(`Heard option ${String.fromCharCode(65 + picked)}`);
+        } else {
+          toast.error("Couldn't understand. Say A, B, C, or D.");
+        }
+      };
+      rec.onerror = () => {};
+      rec.start();
+      recognitionRef.current = rec;
+    } catch {}
   };
 
   if (generatingQuiz) {
@@ -108,9 +189,24 @@ export default function Quiz() {
             This quiz contains 10 questions specific to your industry and
             skills. Take your time and choose the best answer for each question.
           </p>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <Label className="text-sm">Difficulty</Label>
+              <select className="w-full border rounded p-2" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <Label className="text-sm">Topics (comma separated)</Label>
+              <input className="w-full border rounded p-2" placeholder="e.g., React, SQL, System Design" value={topics} onChange={(e) => setTopics(e.target.value)} />
+            </div>
+          </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={generateQuizFn} className="w-full">
+          <Button onClick={startNewQuiz} className="w-full">
             Start Interview
           </Button>
         </CardFooter>
@@ -126,8 +222,23 @@ export default function Quiz() {
         <CardTitle>
           Question {currentQuestion + 1} of {quizData.length}
         </CardTitle>
+        {timeLeft !== null && (
+          <div className="text-sm text-muted-foreground">Time left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}</div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Label className="text-sm">Voice mode</Label>
+            <input type="checkbox" checked={voiceMode} onChange={(e) => setVoiceMode(e.target.checked)} />
+            {voiceMode && (
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={speakCurrentQuestion}>Speak</Button>
+                <Button type="button" size="sm" variant="outline" onClick={startListening}>Listen</Button>
+              </>
+            )}
+          </div>
+        </div>
         <p className="text-lg font-medium">{question.question}</p>
         <RadioGroup
           onValueChange={handleAnswer}

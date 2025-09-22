@@ -17,30 +17,33 @@ export async function generateCoverLetter(data) {
 
   if (!user) throw new Error("User not found");
 
+  const tone = data.tone || "professional"; // professional | enthusiastic | confident | friendly
+  const style = data.templateStyle || "classic"; // classic | modern | concise
+  const accomplishments = Array.isArray(data.accomplishments)
+    ? data.accomplishments
+    : (data.accomplishments ? String(data.accomplishments).split(/\n+/).map((s) => s.trim()).filter(Boolean) : []);
+
   const prompt = `
-    Write a professional cover letter for a ${data.jobTitle} position at ${
-    data.companyName
-  }.
-    
-    About the candidate:
+    Write a ${tone} cover letter for a ${data.jobTitle} position at ${data.companyName}.
+
+    Candidate profile:
     - Industry: ${user.industry}
     - Years of Experience: ${user.experience}
     - Skills: ${user.skills?.join(", ")}
     - Professional Background: ${user.bio}
-    
+    - Notable Accomplishments: ${accomplishments.join("; ") || "(none provided)"}
+
     Job Description:
     ${data.jobDescription}
-    
-    Requirements:
-    1. Use a professional, enthusiastic tone
-    2. Highlight relevant skills and experience
-    3. Show understanding of the company's needs
-    4. Keep it concise (max 400 words)
-    5. Use proper business letter formatting in markdown
-    6. Include specific examples of achievements
-    7. Relate candidate's background to job requirements
-    
-    Format the letter in markdown.
+
+    Style guidelines:
+    - Template Style: ${style} (${style === "classic" ? "business letter format with clear paragraphs" : style === "modern" ? "short paragraphs, skimmable bullets, bold highlights for impact" : "very concise, focused on alignment and value"})
+    - Length: max 400 words
+    - Use proper business letter formatting in markdown
+    - Emphasize alignment with company needs and concrete outcomes
+    - Include specific examples with metrics when possible
+
+    Output: Markdown cover letter only.
   `;
 
   try {
@@ -53,6 +56,26 @@ export async function generateCoverLetter(data) {
         jobDescription: data.jobDescription,
         companyName: data.companyName,
         jobTitle: data.jobTitle,
+        // Persist generation context for future edits
+        status: "completed",
+        userId: user.id,
+      },
+    });
+
+    return coverLetter;
+  } catch (error) {
+    console.error("Error generating cover letter:", error.message);
+    throw new Error("Failed to generate cover letter");
+  }
+}
+
+export async function listCoverLetterTemplates() {
+  return [
+    { id: "classic", name: "Classic Business" },
+    { id: "modern", name: "Modern Impact" },
+    { id: "concise", name: "Concise Alignment" },
+  ];
+}
         status: "completed",
         userId: user.id,
       },

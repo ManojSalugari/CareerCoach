@@ -61,7 +61,7 @@ const HeroSection = () => {
   playsInline
   style={{ minHeight: "400px" }}
 >
-  <source src="careercoach.mp4" type="video/mp4" />
+<source src="/jobsculpt.mp4" type="video/mp4" />
   {/* Ensure the video file is in the 'public' directory */}
   Your browser does not support the video tag.
             </video>

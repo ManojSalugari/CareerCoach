@@ -16,13 +16,11 @@ export default function DropBox({
 
   const readPdfText = async (file) => {
     try {
-      const pdfjs = await import("pdfjs-dist/build/pdf");
-      const workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
-      // eslint-disable-next-line no-underscore-dangle
-      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+      const workerVersion = pdfjsLib.version || "4.4.168";
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${workerVersion}/pdf.worker.min.js`;
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const numPages = pdf.numPages;
       let fullText = "";
       for (let pageNum = 1; pageNum <= numPages; pageNum += 1) {

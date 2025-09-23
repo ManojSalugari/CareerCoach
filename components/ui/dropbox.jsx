@@ -16,9 +16,16 @@ export default function DropBox({
 
   const readPdfText = async (file) => {
     try {
-      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+      let pdfjsLib;
+      try {
+        pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+      } catch {
+        pdfjsLib = await import("pdfjs-dist/build/pdf");
+      }
       const workerVersion = pdfjsLib.version || "4.4.168";
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${workerVersion}/pdf.worker.min.js`;
+      if (typeof pdfjsLib.GlobalWorkerOptions !== "undefined") {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${workerVersion}/pdf.worker.min.js`;
+      }
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const numPages = pdf.numPages;
@@ -29,9 +36,18 @@ export default function DropBox({
         const strings = content.items.map((item) => item.str);
         fullText += strings.join(" ") + "\n\n";
       }
-      return fullText.trim();
+      const text = fullText.trim();
+      if (!text) {
+        throw new Error("No extractable text found (likely scanned image PDF).");
+      }
+      return text;
     } catch (e) {
-      alert("Failed to extract text from PDF");
+      console.error("PDF text extraction error", e);
+      alert(
+        e?.message?.includes("No extractable text")
+          ? "Failed to extract text: PDF appears to be scanned/image-only (OCR required)."
+          : "Failed to extract text from PDF (worker blocked or invalid file)."
+      );
       return "";
     }
   };

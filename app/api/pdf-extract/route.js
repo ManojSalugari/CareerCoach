@@ -1,4 +1,5 @@
-import pdfParse from "pdf-parse";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   try {
@@ -7,6 +8,7 @@ export async function POST(request) {
       return new Response(JSON.stringify({ error: "Empty request body" }), { status: 400, headers: { "content-type": "application/json" } });
     }
     const buffer = Buffer.from(arrayBuffer);
+    const { default: pdfParse } = await import("pdf-parse");
     const result = await pdfParse(buffer);
     const text = (result?.text || "").trim();
     if (!text) {

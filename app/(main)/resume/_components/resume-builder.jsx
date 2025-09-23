@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { saveResume, getResumeVersions } from "@/actions/resume";
+import { saveResume, getResumeVersions, parseResumeToFields } from "@/actions/resume";
 import { EntryForm } from "./entry-form";
 import useFetch from "@/hooks/use-fetch";
 import { useUser } from "@clerk/nextjs";
@@ -189,6 +189,7 @@ export default function ResumeBuilder({ initialContent }) {
   };
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
 
   const generatePDF = async () => {
     setIsGenerating(true);
@@ -267,9 +268,30 @@ export default function ResumeBuilder({ initialContent }) {
         label="Drag & drop your resume text to populate"
         hint="Accepted: .txt, .md, .pdf"
         accept=".txt,.md,.pdf"
-        onText={(text) => {
-          setPreviewContent(text);
-          setActiveTab("preview");
+        onText={async (text) => {
+          try {
+            setPreviewContent(text);
+            setActiveTab("preview");
+            setIsParsing(true);
+            const fields = await parseResumeToFields(text);
+            // Update form fields by dispatching a full reset via direct DOM event to avoid losing RHF context
+            // We will map minimal fields using controlled components via manual set by inputs references is not available here
+            // So we update previewContent using entriesToMarkdown; the form will reflect edits made later
+            const content = [
+              (fields?.contactInfo ? getContactMarkdown() : null),
+              fields?.summary ? `## Professional Summary\n\n${fields.summary}` : null,
+              fields?.skills ? `## Skills\n\n${fields.skills}` : null,
+              entriesToMarkdown(fields?.experience || [], "Work Experience"),
+              entriesToMarkdown(fields?.education || [], "Education"),
+              entriesToMarkdown(fields?.projects || [], "Projects"),
+            ].filter(Boolean).join("\n\n");
+            if (content) setPreviewContent(content);
+            toast.success("Parsed resume and prefilled content");
+          } catch (e) {
+            toast.error(e.message || "Failed to parse resume with AI");
+          } finally {
+            setIsParsing(false);
+          }
         }}
       />
       <div className="flex flex-col md:flex-row justify-between items-center gap-2">
@@ -277,6 +299,11 @@ export default function ResumeBuilder({ initialContent }) {
           Resume Builder
         </h1>
         <div className="space-x-2">
+          {isParsing ? (
+            <div className="inline-flex items-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Parsing PDF...
+            </div>
+          ) : null}
           <Button
             variant="destructive"
             onClick={handleSubmit(onSubmit)}

@@ -129,3 +129,46 @@ export async function improveWithAI({ current, type }) {
     throw new Error("Failed to improve content");
   }
 }
+
+// Parse unstructured resume text into structured resume fields
+export async function parseResumeToFields(resumeText) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  if (!resumeText || typeof resumeText !== "string" || resumeText.trim().length < 20) {
+    throw new Error("Provide a valid resume text");
+  }
+
+  const prompt = `
+    You are an expert resume parser. Extract the following fields from the resume below.
+    Return ONLY strict JSON matching this TypeScript type with sensible defaults when missing:
+    type Resume = {
+      contactInfo: { email?: string; mobile?: string; linkedin?: string; twitter?: string };
+      summary: string;
+      skills: string; // a comma-separated list
+      experience: Array<{ title: string; organization: string; startDate?: string; endDate?: string; current?: boolean; description?: string }>;
+      education: Array<{ title: string; organization: string; startDate?: string; endDate?: string; current?: boolean; description?: string }>;
+      projects: Array<{ title: string; organization?: string; startDate?: string; endDate?: string; current?: boolean; description?: string }>;
+    };
+
+    Resume Text:
+    ${resumeText}
+
+    IMPORTANT:
+    - Fill arrays with 0-6 items as available.
+    - Dates can be free text if uncertain (e.g., "2022", "Present").
+    - Do not include any additional commentary.
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+    const cleaned = text.replace(/```(?:json)?\n?/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    return parsed;
+  } catch (e) {
+    console.error("Error parsing resume text:", e);
+    throw new Error("Failed to parse resume text");
+  }
+}

@@ -23,11 +23,32 @@ export default function DropBox({
         pdfjsLib = await import("pdfjs-dist/build/pdf");
       }
       const workerVersion = pdfjsLib.version || "4.4.168";
-      if (typeof pdfjsLib.GlobalWorkerOptions !== "undefined") {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${workerVersion}/pdf.worker.min.js`;
-      }
+      const setWorkerSrc = (src) => {
+        if (typeof pdfjsLib.GlobalWorkerOptions !== "undefined") {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = src;
+        }
+      };
+
+      // 1) Try CDN worker
+      setWorkerSrc(`https://cdn.jsdelivr.net/npm/pdfjs-dist@${workerVersion}/build/pdf.worker.min.js`);
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let pdf;
+      try {
+        pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      } catch (err1) {
+        // 2) Fallback: fetch worker script, create blob URL (same-origin)
+        try {
+          const resp = await fetch(`https://cdn.jsdelivr.net/npm/pdfjs-dist@${workerVersion}/build/pdf.worker.min.js`, { mode: "cors" });
+          const script = await resp.text();
+          const blob = new Blob([script], { type: "text/javascript" });
+          const blobUrl = URL.createObjectURL(blob);
+          setWorkerSrc(blobUrl);
+          pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        } catch (err2) {
+          console.error("Worker setup failed", err1, err2);
+          throw new Error("Worker blocked");
+        }
+      }
       const numPages = pdf.numPages;
       let fullText = "";
       for (let pageNum = 1; pageNum <= numPages; pageNum += 1) {
@@ -46,8 +67,24 @@ export default function DropBox({
       alert(
         e?.message?.includes("No extractable text")
           ? "Failed to extract text: PDF appears to be scanned/image-only (OCR required)."
-          : "Failed to extract text from PDF (worker blocked or invalid file)."
+          : "Failed to extract text from PDF (worker blocked or invalid file). Try another PDF or paste text manually."
       );
+      return "";
+    }
+  };
+
+  const serverExtractPdf = async (file) => {
+    try {
+      const resp = await fetch("/api/pdf-extract", {
+        method: "POST",
+        headers: { "content-type": "application/pdf" },
+        body: file,
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const data = await resp.json();
+      return data.text || "";
+    } catch (e) {
+      console.error("Server PDF extract failed", e);
       return "";
     }
   };
@@ -65,7 +102,10 @@ export default function DropBox({
       return;
     }
     if (lower.endsWith(".pdf") || file.type === "application/pdf") {
-      const text = await readPdfText(file);
+      let text = await readPdfText(file);
+      if (!text) {
+        text = await serverExtractPdf(file);
+      }
       setFileName(file.name);
       if (text && typeof onText === "function") onText(text, file.name);
       return;

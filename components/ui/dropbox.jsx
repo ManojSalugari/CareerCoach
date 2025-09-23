@@ -73,6 +73,40 @@ export default function DropBox({
     }
   };
 
+  const ocrPdfToText = async (file) => {
+    try {
+      const [{ default: Tesseract }, pdfjsLib] = await Promise.all([
+        import("tesseract.js"),
+        (async () => {
+          try { return await import("pdfjs-dist/legacy/build/pdf"); } catch { return await import("pdfjs-dist/build/pdf"); }
+        })(),
+      ]);
+      const workerVersion = pdfjsLib.version || "4.4.168";
+      if (typeof pdfjsLib.GlobalWorkerOptions !== "undefined") {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${workerVersion}/build/pdf.worker.min.js`;
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let pageNum = 1; pageNum <= Math.min(pdf.numPages, 5); pageNum += 1) {
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: context, viewport }).promise;
+        const { data: { text } } = await Tesseract.recognize(canvas, "eng", { logger: () => {} });
+        fullText += (text || "") + "\n\n";
+      }
+      return fullText.trim();
+    } catch (e) {
+      console.error("OCR failed", e);
+      alert("OCR failed to extract text from PDF");
+      return "";
+    }
+  };
+
   const serverExtractPdf = async (file) => {
     try {
       const resp = await fetch("/api/pdf-extract", {
@@ -80,11 +114,21 @@ export default function DropBox({
         headers: { "content-type": "application/pdf" },
         body: file,
       });
-      if (!resp.ok) throw new Error(await resp.text());
-      const data = await resp.json();
+      const text = await resp.text();
+      if (!resp.ok) {
+        // Try to parse error json; fallback to text
+        try {
+          const data = JSON.parse(text);
+          throw new Error(data?.error || text || "Server extraction failed");
+        } catch {
+          throw new Error(text || "Server extraction failed");
+        }
+      }
+      const data = JSON.parse(text);
       return data.text || "";
     } catch (e) {
       console.error("Server PDF extract failed", e);
+      alert(`Server PDF extraction failed: ${e?.message || "Unknown error"}`);
       return "";
     }
   };
@@ -102,11 +146,14 @@ export default function DropBox({
       return;
     }
     if (lower.endsWith(".pdf") || file.type === "application/pdf") {
+      if (file.size > 8 * 1024 * 1024) {
+        alert("PDF too large (max 8MB). Please upload a smaller file.");
+        return;
+      }
       // Prefer server-side extraction to avoid browser worker/CORS issues
       let text = await serverExtractPdf(file);
-      if (!text) {
-        text = await readPdfText(file);
-      }
+      if (!text) text = await readPdfText(file);
+      if (!text) text = await ocrPdfToText(file);
       setFileName(file.name);
       if (text && typeof onText === "function") onText(text, file.name);
       return;

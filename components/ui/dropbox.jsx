@@ -102,9 +102,10 @@ export default function DropBox({
       return;
     }
     if (lower.endsWith(".pdf") || file.type === "application/pdf") {
-      let text = await readPdfText(file);
+      // Prefer server-side extraction to avoid browser worker/CORS issues
+      let text = await serverExtractPdf(file);
       if (!text) {
-        text = await serverExtractPdf(file);
+        text = await readPdfText(file);
       }
       setFileName(file.name);
       if (text && typeof onText === "function") onText(text, file.name);

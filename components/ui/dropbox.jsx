@@ -109,11 +109,9 @@ export default function DropBox({
 
   const serverExtractPdf = async (file) => {
     try {
-      const resp = await fetch("/api/pdf-extract", {
-        method: "POST",
-        headers: { "content-type": "application/pdf" },
-        body: file,
-      });
+      const form = new FormData();
+      form.append("file", file, file.name || "resume.pdf");
+      const resp = await fetch("/api/pdf-extract", { method: "POST", body: form });
       const text = await resp.text();
       if (!resp.ok) {
         // Try to parse error json; fallback to text

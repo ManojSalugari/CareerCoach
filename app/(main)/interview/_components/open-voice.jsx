@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import useFetch from "@/hooks/use-fetch";
 import { generateOpenEndedQuestions, evaluateOpenEndedAnswer } from "@/actions/interview";
+import DropBox from "@/components/ui/dropbox";
 
 export default function OpenVoiceInterview() {
   const [mode, setMode] = useState("HR");
@@ -105,10 +106,24 @@ export default function OpenVoiceInterview() {
               <div>
                 <Label className="text-sm">Job Description (optional)</Label>
                 <textarea className="w-full border rounded p-2 h-28" value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} />
+                <DropBox
+                  className="mt-2"
+                  label="Drag & drop JD file or click to browse"
+                  hint="Accepted: .txt"
+                  accept=".txt"
+                  onText={(text) => setJobDescription(text)}
+                />
               </div>
               <div>
                 <Label className="text-sm">Resume (optional)</Label>
                 <textarea className="w-full border rounded p-2 h-28" value={resumeContent} onChange={(e) => setResumeContent(e.target.value)} />
+                <DropBox
+                  className="mt-2"
+                  label="Drag & drop resume file or click to browse"
+                  hint="Accepted: .txt, .md"
+                  accept=".txt,.md"
+                  onText={(text) => setResumeContent(text)}
+                />
               </div>
             </div>
           </>

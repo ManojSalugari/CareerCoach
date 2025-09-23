@@ -20,6 +20,7 @@ import {
   getATSAnalysisHistory,
   getLatestATSAnalysis,
 } from "@/actions/ats-optimization";
+import DropBox from "@/components/ui/dropbox";
 
 const ScoreCard = ({ title, score, icon: Icon, color }) => (
   <Card>
@@ -261,19 +262,36 @@ export default function ATSOptimizationPanel({ resumeContent }) {
               className="mt-1"
               rows={4}
             />
-            <div className="flex items-center gap-3 mt-3">
-              <Input
-                id="jd-file"
-                type="file"
-                accept=".txt"
-                onChange={handleJDFileUpload}
-              />
-              {jdFileName ? (
-                <span className="text-xs text-gray-600">Loaded: {jdFileName}</span>
-              ) : (
-                <span className="text-xs text-gray-500">Upload .txt file</span>
-              )}
-            </div>
+            <DropBox
+              className="mt-3"
+              label="Drag & drop JD file or click to browse"
+              hint={jdFileName ? `Loaded: ${jdFileName}` : "Accepted: .txt"}
+              accept=".txt"
+              onText={(text, name) => {
+                setJobDescription(text);
+                setJdFileName(name || "");
+                toast.success("Job description loaded from file");
+              }}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="resume-text">Resume (Optional)</Label>
+            <Textarea
+              id="resume-text"
+              placeholder="Paste resume content for analysis or drag & drop below..."
+              value={resumeText}
+              onChange={(e) => setResumeText(e.target.value)}
+              className="mt-1"
+              rows={4}
+            />
+            <DropBox
+              className="mt-3"
+              label="Drag & drop resume text file or click to browse"
+              hint="Accepted: .txt, .md"
+              accept=".txt,.md"
+              onText={(text) => setResumeText(text)}
+            />
           </div>
           
           <div className="flex space-x-2">

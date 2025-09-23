@@ -265,8 +265,8 @@ export default function ResumeBuilder({ initialContent }) {
     <div data-color-mode="light" className="space-y-4">
       <DropBox
         label="Drag & drop your resume text to populate"
-        hint="Accepted: .txt, .md"
-        accept=".txt,.md"
+        hint="Accepted: .txt, .md, .pdf"
+        accept=".txt,.md,.pdf"
         onText={(text) => {
           setPreviewContent(text);
           setActiveTab("preview");

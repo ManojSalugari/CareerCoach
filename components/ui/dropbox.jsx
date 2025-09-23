@@ -4,8 +4,8 @@ import { useCallback, useRef, useState } from "react";
 
 export default function DropBox({
   label = "Drag & drop a file here, or click to browse",
-  hint = "Accepted: .txt",
-  accept = ".txt",
+  hint = "Accepted: .txt, .md, .pdf",
+  accept = ".txt,.md,.pdf",
   onText,
   className = "",
   disabled = false,
@@ -14,16 +14,46 @@ export default function DropBox({
   const [fileName, setFileName] = useState("");
   const inputRef = useRef(null);
 
-  const readFileAsText = (file) => {
+  const readPdfText = async (file) => {
+    try {
+      const pdfjs = await import("pdfjs-dist/build/pdf");
+      const workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+      // eslint-disable-next-line no-underscore-dangle
+      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      const numPages = pdf.numPages;
+      let fullText = "";
+      for (let pageNum = 1; pageNum <= numPages; pageNum += 1) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const strings = content.items.map((item) => item.str);
+        fullText += strings.join(" ") + "\n\n";
+      }
+      return fullText.trim();
+    } catch (e) {
+      alert("Failed to extract text from PDF");
+      return "";
+    }
+  };
+
+  const readFileAsText = async (file) => {
     if (!file) return;
-    const lower = file.name.toLowerCase();
-    const allowed = accept
+    const lower = (file.name || "").toLowerCase();
+    const allowed = (accept || "")
       .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
-    const isAllowed = allowed.some((ext) => lower.endsWith(ext.replace(".", ".")));
+    const isAllowed = allowed.length === 0 || allowed.some((ext) => lower.endsWith(ext));
     if (!isAllowed) {
       alert(`Unsupported file type. Allowed: ${accept}`);
+      return;
+    }
+    if (lower.endsWith(".pdf") || file.type === "application/pdf") {
+      const text = await readPdfText(file);
+      setFileName(file.name);
+      if (text && typeof onText === "function") onText(text, file.name);
       return;
     }
     const reader = new FileReader();
@@ -77,7 +107,7 @@ export default function DropBox({
           accept={accept}
           className="hidden"
           disabled={disabled}
-          onChange={(e) => readFileAsText(e.target.files?.[0])}
+          onChange={async (e) => readFileAsText(e.target.files?.[0])}
         />
       </div>
     </div>

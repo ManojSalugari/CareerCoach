@@ -109,8 +109,8 @@ export default function OpenVoiceInterview() {
                 <DropBox
                   className="mt-2"
                   label="Drag & drop JD file or click to browse"
-                  hint="Accepted: .txt"
-                  accept=".txt"
+                  hint="Accepted: .txt, .pdf"
+                  accept=".txt,.pdf"
                   onText={(text) => setJobDescription(text)}
                 />
               </div>
@@ -120,8 +120,8 @@ export default function OpenVoiceInterview() {
                 <DropBox
                   className="mt-2"
                   label="Drag & drop resume file or click to browse"
-                  hint="Accepted: .txt, .md"
-                  accept=".txt,.md"
+                  hint="Accepted: .txt, .md, .pdf"
+                  accept=".txt,.md,.pdf"
                   onText={(text) => setResumeContent(text)}
                 />
               </div>

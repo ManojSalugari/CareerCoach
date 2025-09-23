@@ -265,8 +265,8 @@ export default function ATSOptimizationPanel({ resumeContent }) {
             <DropBox
               className="mt-3"
               label="Drag & drop JD file or click to browse"
-              hint={jdFileName ? `Loaded: ${jdFileName}` : "Accepted: .txt"}
-              accept=".txt"
+              hint={jdFileName ? `Loaded: ${jdFileName}` : "Accepted: .txt, .pdf"}
+              accept=".txt,.pdf"
               onText={(text, name) => {
                 setJobDescription(text);
                 setJdFileName(name || "");
@@ -288,8 +288,8 @@ export default function ATSOptimizationPanel({ resumeContent }) {
             <DropBox
               className="mt-3"
               label="Drag & drop resume text file or click to browse"
-              hint="Accepted: .txt, .md"
-              accept=".txt,.md"
+              hint="Accepted: .txt, .md, .pdf"
+              accept=".txt,.md,.pdf"
               onText={(text) => setResumeText(text)}
             />
           </div>

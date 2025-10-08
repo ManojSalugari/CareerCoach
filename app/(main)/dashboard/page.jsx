@@ -6,18 +6,21 @@ import { getUserOnboardingStatus } from "@/actions/user";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
-  const { isOnboarded } = await getUserOnboardingStatus();
+  const { isOnboarded, userId } = await getUserOnboardingStatus();
 
   // If not onboarded, redirect to onboarding page
-  // Skip this check if already on the onboarding page
   if (!isOnboarded) {
     redirect("/onboarding");
   }
 
+  // If no userId from auth, redirect to sign-in
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
   const insights = await getIndustryInsights();
   const atsHistory = await getATSAnalysisHistory();
-  // Aggregate quiz accuracy by topic from assessments
-  const { userId } = await getUserOnboardingStatus();
+  
   // Resolve the DB user safely using clerk userId
   const user = await db.user.findUnique({ where: { clerkUserId: userId } });
   if (!user) {
